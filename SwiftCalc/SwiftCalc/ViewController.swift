@@ -7,6 +7,90 @@
 //
 
 import UIKit
+extension String {
+    /*
+     let string = "Hello,World!"
+     string.substring(from: 1, to: 7)gets you: ello,Wo
+     string.substring(to: 7)gets you: Hello,Wo
+     string.substring(from: 3)gets you: lo,World!
+     string.substring(from: 1, length: 4)gets you: ello
+     string.substring(length: 4, to: 7)gets you: o,Wo
+    */
+    
+    func substring(from: Int?, to: Int?) -> String {
+        if let start = from {
+            guard start < self.characters.count else {
+                return ""
+            }
+        }
+        
+        if let end = to {
+            guard end > 0 else {
+                return ""
+            }
+        }
+        
+        if let start = from, let end = to {
+            guard end - start > 0 else {
+                return ""
+            }
+        }
+        
+        let startIndex: String.Index
+        if let start = from, start >= 0 {
+            startIndex = self.index(self.startIndex, offsetBy: start)
+        } else {
+            startIndex = self.startIndex
+        }
+        
+        let endIndex: String.Index
+        if let end = to, end >= 0, end < self.characters.count {
+            endIndex = self.index(self.startIndex, offsetBy: end + 1)
+        } else {
+            endIndex = self.endIndex
+        }
+        
+        return self[startIndex ..< endIndex]
+    }
+    
+    func substring(from: Int) -> String {
+        return self.substring(from: from, to: nil)
+    }
+    
+    func substring(to: Int) -> String {
+        return self.substring(from: nil, to: to)
+    }
+    
+    func substring(from: Int?, length: Int) -> String {
+        guard length > 0 else {
+            return ""
+        }
+        
+        let end: Int
+        if let start = from, start > 0 {
+            end = start + length - 1
+        } else {
+            end = length
+        }
+        
+        return self.substring(from: from, to: end)
+    }
+    
+    func substring(length: Int, to: Int?) -> String {
+        guard let end = to, end > 0, length > 0 else {
+            return ""
+        }
+        
+        let start: Int
+        if let end = to, end - length > 0 {
+            start = end - length + 1
+        } else {
+            start = 0
+        }
+        
+        return self.substring(from: start, to: to)
+    }
+}
 
 class ViewController: UIViewController {
     // MARK: Width and Height of Screen for Layout
@@ -19,10 +103,31 @@ class ViewController: UIViewController {
     // MARK: The label to display our calculations
     var resultLabel = UILabel()
     
-    // TODO: This looks like a good place to add some data structures.
+    // Done: This looks like a good place to add some data structures.
     //       One data structure is initialized below for reference.
-    var someDataStructure: [String] = [""]
+    // TODO: Add support for "%" decimal operator
+    // TODO: Reset calculations when "=" is pressed, or resume calculation when "=", then "+" is pressed.
+    var sign = 1
+    var resultSign = 1
+    var inputText = ["+"]
+    var resultString = "+0"
+    var previousOperator = ""
+    var currentOperator = ""
+    var readyToCalculate = false
     
+    func resetCalculatorValues() {
+        resultSign = 1
+        resultString = "+0"
+        previousOperator = ""
+        currentOperator = ""
+        resetInputText()
+    }
+    func resetInputText() {
+        sign = 1
+        inputText = ["+"]
+        readyToCalculate = false
+    }
+
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -43,53 +148,182 @@ class ViewController: UIViewController {
         // Dispose of any resources that can be recreated.
     }
     
-    // TODO: A method to update your data structure(s) would be nice.
+    // Done: A method to update your data structure(s) would be nice.
     //       Modify this one or create your own.
-    func updateSomeDataStructure(_ content: String) {
-        print("Update me like one of those PCs")
+    func updateInputText(_ content: String) {
+        if (inputText.count < 7) || ((sign == 1) && (inputText.count < 8)) {
+            inputText.append(content)
+            readyToCalculate = true
+        }
     }
     
-    // TODO: Ensure that resultLabel gets updated.
+    func updateSign() {
+        if currentOperator == "+/-" && inputText.count < 2 {
+            resultSign *= -1
+            if resultSign == 1 {
+                resultString = "+\(resultString.substring(from: 1))"
+            } else {
+                resultString = "-\(resultString.substring(from: 1))"
+            }
+            updateResultLabel(resultString)
+        } else if (currentOperator == "+/-" && inputText.count < 8) {
+            sign *= -1
+            if sign == 1 {
+                inputText[0] = "+"
+            } else {
+                inputText[0] = "-"
+            }
+            updateResultLabel(inputText.joined())
+        }
+    }
+    
+    // Done: Ensure that resultLabel gets updated.
     //       Modify this one or create your own.
     func updateResultLabel(_ content: String) {
-        print("Update me like one of those PCs")
+        if (inputText.count < 2 && previousOperator != "") {
+            // let intResult = Int(Double(content)!) // cast to Double?, unwrap, then to Int
+            // let doubleResult = Double(content)!
+            let intResult = (content as NSString).integerValue // better way of casting than comments above
+            let doubleResult = (content as NSString).doubleValue
+            if doubleResult == Double(intResult) {
+                resultLabel.text = String(intResult)
+            } else {
+                // resultLabel.text = String(content.characters.dropFirst())
+                resultLabel.text = String(doubleResult)
+            }
+        } else if ((sign == 1 && inputText.count >= 2) || (resultSign == 1 && inputText.count < 2)) {
+            resultLabel.text = String(content.characters.dropFirst())
+        } else {
+            resultLabel.text = content
+        }
     }
     
     
-    // TODO: A calculate method with no parameters, scary!
+    // Done: A calculate method with no parameters, scary!
     //       Modify this one or create your own.
     func calculate() -> String {
-        return "0"
+        if inputText.count < 2 {
+            return resultString
+        }
+        let inputString = inputText.joined()
+        
+        let intInputString = Int(inputString) // wrapped Int
+        let intResultString = Int(resultString) // wrapped Int
+        resultSign = 1
+        
+        // Don't perform int division when operator is "/", instead perform double division.
+        if previousOperator != "/" && intInputString != nil && intResultString != nil {
+            let intResult = intCalculate(firstOperand: intResultString!, secondOperand: intInputString!, operation: previousOperator)
+            let stringIntCalcResult = String(intResult)
+            if intResult < 0 {
+                resultSign = -1
+                return stringIntCalcResult // negative sign already there
+            }
+            return "+\(stringIntCalcResult)" // add positive sign
+        }
+        
+        // Done: Perform error checking, return 0 if error
+        let doubleInputString = Double(inputString) // wrapped Int
+        let doubleResultString = Double(resultString) // wrapped Int
+        if doubleInputString == nil || doubleResultString == nil {
+            return "0"
+        }
+        let doubleResult = calculate(firstOperand: resultString, secondOperand: inputString, operation: previousOperator)
+        let stringDoubleCalcResult = String(doubleResult)
+        if doubleResult < 0 {
+            resultSign = -1
+            return stringDoubleCalcResult // negative sign already there
+        }
+        return "+\(stringDoubleCalcResult)" // add positive sign
     }
     
-    // TODO: A simple calculate method for integers.
+    // Done: A simple calculate method for integers.
     //       Modify this one or create your own.
-    func intCalculate(a: Int, b:Int, operation: String) -> Int {
-        print("Calculation requested for \(a) \(operation) \(b)")
-        return 0
+    func intCalculate(firstOperand: Int, secondOperand:Int, operation: String) -> Int {
+        let a = firstOperand
+        let b = secondOperand
+        var result: Int = 0
+        switch operation {
+        // case "/":            // Not using integer division
+        //    result = a / b
+        case "*":
+            result = a * b
+        case "-":
+            result = a - b
+        case "+":
+            result = a + b
+        default:
+            result = a + b
+        }
+        return result
     }
     
-    // TODO: A general calculate method for doubles
+    // Done: A general calculate method for doubles
     //       Modify this one or create your own.
-    func calculate(a: String, b:String, operation: String) -> Double {
-        print("Calculation requested for \(a) \(operation) \(b)")
-        return 0.0
+    func calculate(firstOperand: String, secondOperand:String, operation: String) -> Double {
+        let firstOp = Double(firstOperand) // wrapped Double
+        let secondOp = Double(secondOperand) // wrapped Double
+        var result: Double = 0
+        if firstOp != nil && secondOp != nil {
+            let a = firstOp!
+            let b = secondOp!
+            switch operation {
+            case "/":
+                result = a / b
+            case "*":
+                result = a * b
+            case "-":
+                result = a - b
+            case "+":
+                result = a + b
+            default:
+                result = a + b
+            }
+        }
+        return result
     }
     
     // REQUIRED: The responder to a number button being pressed.
     func numberPressed(_ sender: CustomButton) {
-        guard Int(sender.content) != nil else { return }
-        print("The number \(sender.content) was pressed")
+        updateInputText(sender.content)
+        updateResultLabel(inputText.joined())
+//        guard Int(sender.content) != nil else { return }
+//        print("The number \(sender.content) was pressed")
         // Fill me in!
     }
     
     // REQUIRED: The responder to an operator button being pressed.
     func operatorPressed(_ sender: CustomButton) {
+        let operation = sender.content
+        currentOperator = operation
+        
+        switch operation {
+        case "C":
+            resetCalculatorValues()
+            updateResultLabel(resultString)
+        case "+/-":
+            updateSign() // also updates result label
+        case "/", "*", "-", "+", "=":
+            if readyToCalculate {
+                resultString = calculate()
+                resetInputText()
+                updateResultLabel(resultString)
+            }
+            if (operation != "=") {
+                previousOperator = currentOperator
+            }
+        default:
+            updateResultLabel(inputText.joined())
+        }
+//        guard Int(sender.content) != nil else { return }
+//        print("The number \(sender.content) was pressed")
         // Fill me in!
     }
     
     // REQUIRED: The responder to a number or operator button being pressed.
     func buttonPressed(_ sender: CustomButton) {
+        updateInputText(sender.content)
+        updateResultLabel(inputText.joined())
        // Fill me in!
     }
     
@@ -173,4 +407,3 @@ class ViewController: UIViewController {
     }
 
 }
-
