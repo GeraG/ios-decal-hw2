@@ -203,6 +203,7 @@ class ViewController: UIViewController {
     var resultString = "+0"
     var previousOperator = ""
     var currentOperator = ""
+    var errorOccured = false
     var alreadyCalculated = false
     var isFirstInput = true
     var isArithmeticOperator = false
@@ -214,6 +215,7 @@ class ViewController: UIViewController {
         resultString = "+0"
         previousOperator = ""
         currentOperator = ""
+        errorOccured = false
         alreadyCalculated = false
         isFirstInput = true
         isArithmeticOperator = false
@@ -267,7 +269,7 @@ class ViewController: UIViewController {
     }
     
     func updateSign() {
-        if hasInput || isFirstInput || isArithmeticOperator { // negate input
+        if hasInput || isFirstInput || isArithmeticOperator || errorOccured { // negate input
             if !hasInput {
                 resetInputText()
             }
@@ -294,7 +296,9 @@ class ViewController: UIViewController {
     //       Modify this one or create your own.
     func updateResultLabel(_ content: String) {
         let contentArray = Array(content.characters)
-        if (isFirstInput && String(contentArray[0]) == "-") {
+        if (errorOccured && content == "Error") {
+            resultLabel.text = "Error"
+        } else if (isFirstInput && String(contentArray[0]) == "-") {
             // allow negating 0 at start
             resultLabel.text = content
         } else if (!(hasInput)) {
@@ -341,6 +345,11 @@ class ViewController: UIViewController {
     }
     
     func calcIntOrDouble(resultString: String, inputString: String) -> String {
+        if ((Double(inputString) == 0.0 && previousOperator == "/") || errorOccured) {
+            errorOccured = true // signal error if division by 0 or if there's already an error
+            return "Error"
+        }
+        
         let intInputString = Int(inputString) // wrapped Int
         let intResultString = Int(resultString) // wrapped Int
         // Don't perform int division when operator is "/", instead perform double division.
@@ -358,20 +367,22 @@ class ViewController: UIViewController {
         let doubleInputString = Double(inputString) // wrapped Int
         let doubleResultString = Double(resultString) // wrapped Int
         if doubleInputString == nil || doubleResultString == nil {
-            return "0"
+            errorOccured = true
+            return "Error"
         }
+        
         var doubleResult = calculate(firstOperand: resultString, secondOperand: inputString, operation: previousOperator)
         if (currentOperator == "%" && hasInput) {
             doubleResult = calculate(firstOperand: inputString, secondOperand: "100.0", operation: "/")
         } else if (currentOperator == "%") {
             doubleResult = calculate(firstOperand: resultString, secondOperand: "100.0", operation: "/")
         }
-        let stringDoubleCalcResult = String(doubleResult)
+        let stringDoubleResult = String(doubleResult)
         if doubleResult < 0.0 {
             resultSign = -1
-            return stringDoubleCalcResult // negative sign already there
+            return stringDoubleResult // negative sign already there
         }
-        return "+\(stringDoubleCalcResult)" // add positive sign
+        return "+\(stringDoubleResult)" // add positive sign
     }
     
     // Done: A simple calculate method for integers.
