@@ -92,6 +92,27 @@ extension String {
     }
 }
 
+func charArrayToStringArray(charArray: [Character]) -> [String] {
+    var stringArray = [String]()
+    for c in charArray {
+        stringArray.append(String(c))
+    }
+    return stringArray
+}
+
+func truncateCharArray(charArray: [Character], sizeLimit: Int) -> [String] {
+    var stringArray = [String]()
+    var counter = 0
+    for c in charArray {
+        if counter == sizeLimit {
+            return stringArray
+        }
+        stringArray.append(String(c))
+        counter += 1
+    }
+    return stringArray
+}
+
 class ViewController: UIViewController {
     // MARK: Width and Height of Screen for Layout
     var w: CGFloat!
@@ -106,28 +127,37 @@ class ViewController: UIViewController {
     // Done: This looks like a good place to add some data structures.
     //       One data structure is initialized below for reference.
     // TODO: Add support for "%" decimal operator
-    // TODO: Reset calculations when "=" is pressed, or resume calculation when "=", then "+" is pressed.
-    var sign = 1
+    // TODO: Add support for pressing + again after = was already presseed
+    // TODO: Add support for converting double result into int when necessary
+    // TODO: Input history?
+    var inputSign = 1
     var resultSign = 1
-    var inputText = ["+"]
+    var inputText = ["+", "0"]
     var resultString = "+0"
     var previousOperator = ""
     var currentOperator = ""
-    var readyToCalculate = false
+    var alreadyCalculated = false
+    var isFirstInput = true
+    var isArithmeticOperator = false
+    var hasDecimal = false
+    var hasInput = false
     
     func resetCalculatorValues() {
         resultSign = 1
         resultString = "+0"
         previousOperator = ""
         currentOperator = ""
+        alreadyCalculated = false
+        isFirstInput = true
+        isArithmeticOperator = false
         resetInputText()
     }
     func resetInputText() {
-        sign = 1
-        inputText = ["+"]
-        readyToCalculate = false
+        inputSign = 1
+        inputText = ["+", "0"]
+        hasDecimal = false
+        hasInput = false
     }
-
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -151,14 +181,35 @@ class ViewController: UIViewController {
     // Done: A method to update your data structure(s) would be nice.
     //       Modify this one or create your own.
     func updateInputText(_ content: String) {
-        if (inputText.count < 7) || ((sign == 1) && (inputText.count < 8)) {
-            inputText.append(content)
-            readyToCalculate = true
+        if currentOperator == "=" || currentOperator == "%"{
+            resetCalculatorValues()
         }
+        if !(hasInput) {
+            resetInputText()
+        }
+        if (content == ".") {
+            hasDecimal = true
+        }
+        if (inputText.count == 2 && inputText[1] == "0" && !(hasDecimal)) {
+            inputText[1] = content
+        } else if (inputText.count < 7) || ((inputSign == 1) && (inputText.count < 8)) {
+            inputText.append(content)
+        }
+        hasInput = true
+        alreadyCalculated = false
     }
     
     func updateSign() {
-        if currentOperator == "+/-" && inputText.count < 2 {
+        if hasInput || isArithmeticOperator { // negate input
+            inputSign *= -1
+            if inputSign == 1 {
+                inputText[0] = "+"
+            } else {
+                inputText[0] = "-"
+            }
+            hasInput = true
+            updateResultLabel(inputText.joined())
+        } else { // negate result
             resultSign *= -1
             if resultSign == 1 {
                 resultString = "+\(resultString.substring(from: 1))"
@@ -166,21 +217,18 @@ class ViewController: UIViewController {
                 resultString = "-\(resultString.substring(from: 1))"
             }
             updateResultLabel(resultString)
-        } else if (currentOperator == "+/-" && inputText.count < 8) {
-            sign *= -1
-            if sign == 1 {
-                inputText[0] = "+"
-            } else {
-                inputText[0] = "-"
-            }
-            updateResultLabel(inputText.joined())
         }
     }
     
     // Done: Ensure that resultLabel gets updated.
     //       Modify this one or create your own.
     func updateResultLabel(_ content: String) {
-        if (inputText.count < 2 && previousOperator != "") {
+        let contentArray = Array(content.characters)
+        if (isFirstInput && String(contentArray[0]) == "-") {
+            // allow negating 0 at start
+            resultLabel.text = content
+        } else if (!(hasInput)) {
+            // display result and convert integer decimals to display as integers without the decimal
             // let intResult = Int(Double(content)!) // cast to Double?, unwrap, then to Int
             // let doubleResult = Double(content)!
             let intResult = (content as NSString).integerValue // better way of casting than comments above
@@ -191,7 +239,8 @@ class ViewController: UIViewController {
                 // resultLabel.text = String(content.characters.dropFirst())
                 resultLabel.text = String(doubleResult)
             }
-        } else if ((sign == 1 && inputText.count >= 2) || (resultSign == 1 && inputText.count < 2)) {
+        } //else if ((sign == 1 && inputText.count >= 2 && displayInput) || (resultSign == 1 && (inputText.count < 2))) {
+        else if (Double(content) != nil && String(contentArray[0]) == "+") {
             resultLabel.text = String(content.characters.dropFirst())
         } else {
             resultLabel.text = content
@@ -202,17 +251,31 @@ class ViewController: UIViewController {
     // Done: A calculate method with no parameters, scary!
     //       Modify this one or create your own.
     func calculate() -> String {
-        if inputText.count < 2 {
+        if isFirstInput && currentOperator != "%" {
+            if hasInput {
+                return inputText.joined()
+            }
             return resultString
         }
+        resultSign = 1
+//        if inputText.count < 2 {
+//            return calcIntOrDouble(resultString: resultString, inputString: resultString)
+//        }
         let inputString = inputText.joined()
-        
+        var result = calcIntOrDouble(resultString: resultString, inputString: inputString)
+        if (resultSign == -1 && result.characters.count > 7) {
+            result = truncateCharArray(charArray: Array(result.characters), sizeLimit: 7).joined()
+        } else if (resultSign == 1 && result.characters.count > 8) {
+            result = truncateCharArray(charArray: Array(result.characters), sizeLimit: 8).joined()
+        }
+        return result
+    }
+    
+    func calcIntOrDouble(resultString: String, inputString: String) -> String {
         let intInputString = Int(inputString) // wrapped Int
         let intResultString = Int(resultString) // wrapped Int
-        resultSign = 1
-        
         // Don't perform int division when operator is "/", instead perform double division.
-        if previousOperator != "/" && intInputString != nil && intResultString != nil {
+        if previousOperator != "/" && currentOperator != "%" && intInputString != nil && intResultString != nil {
             let intResult = intCalculate(firstOperand: intResultString!, secondOperand: intInputString!, operation: previousOperator)
             let stringIntCalcResult = String(intResult)
             if intResult < 0 {
@@ -228,9 +291,14 @@ class ViewController: UIViewController {
         if doubleInputString == nil || doubleResultString == nil {
             return "0"
         }
-        let doubleResult = calculate(firstOperand: resultString, secondOperand: inputString, operation: previousOperator)
+        var doubleResult = calculate(firstOperand: resultString, secondOperand: inputString, operation: previousOperator)
+        if (currentOperator == "%" && hasInput) {
+            doubleResult = calculate(firstOperand: inputString, secondOperand: "100.0", operation: "/")
+        } else if (currentOperator == "%") {
+            doubleResult = calculate(firstOperand: resultString, secondOperand: "100.0", operation: "/")
+        }
         let stringDoubleCalcResult = String(doubleResult)
-        if doubleResult < 0 {
+        if doubleResult < 0.0 {
             resultSign = -1
             return stringDoubleCalcResult // negative sign already there
         }
@@ -253,7 +321,7 @@ class ViewController: UIViewController {
         case "+":
             result = a + b
         default:
-            result = a + b
+            break
         }
         return result
     }
@@ -277,7 +345,7 @@ class ViewController: UIViewController {
             case "+":
                 result = a + b
             default:
-                result = a + b
+                break
             }
         }
         return result
@@ -302,16 +370,34 @@ class ViewController: UIViewController {
             resetCalculatorValues()
             updateResultLabel(resultString)
         case "+/-":
-            updateSign() // also updates result label
-        case "/", "*", "-", "+", "=":
-            if readyToCalculate {
+            updateSign() // also updates the displayed resultLabel
+        case "%":
+            if hasInput {
+                inputText = charArrayToStringArray(charArray: Array(calculate().characters))
+                updateResultLabel(inputText.joined())
+            } else {
+                resultString = charArrayToStringArray(charArray: Array(calculate().characters)).joined()
+                updateResultLabel(resultString)
+            }
+            isArithmeticOperator = false
+        case "/", "*", "-", "+":
+            if !(alreadyCalculated) {
                 resultString = calculate()
+                alreadyCalculated = true
+                hasInput = false
                 resetInputText()
                 updateResultLabel(resultString)
             }
-            if (operation != "=") {
-                previousOperator = currentOperator
-            }
+            isFirstInput = false
+            isArithmeticOperator = true
+            inputText = charArrayToStringArray(charArray: Array(resultString.characters))
+            previousOperator = currentOperator
+        case "=":
+            resultString = calculate()
+            alreadyCalculated = true
+            hasInput = false
+            isArithmeticOperator = false
+            updateResultLabel(resultString)
         default:
             updateResultLabel(inputText.joined())
         }
@@ -405,5 +491,4 @@ class ViewController: UIViewController {
             }
         }
     }
-
 }
