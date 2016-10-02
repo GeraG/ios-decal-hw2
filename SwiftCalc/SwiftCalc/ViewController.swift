@@ -126,10 +126,6 @@ class ViewController: UIViewController {
     
     // Done: This looks like a good place to add some data structures.
     //       One data structure is initialized below for reference.
-    // TODO: Add support for "%" decimal operator
-    // TODO: Add support for pressing + again after = was already presseed
-    // TODO: Add support for converting double result into int when necessary
-    // TODO: Input history?
     var inputSign = 1
     var resultSign = 1
     var inputText = ["+", "0"]
@@ -200,7 +196,10 @@ class ViewController: UIViewController {
     }
     
     func updateSign() {
-        if hasInput || isArithmeticOperator { // negate input
+        if hasInput || isFirstInput || isArithmeticOperator { // negate input
+            if !hasInput {
+                resetInputText()
+            }
             inputSign *= -1
             if inputSign == 1 {
                 inputText[0] = "+"
