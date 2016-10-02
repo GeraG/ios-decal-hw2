@@ -101,16 +101,87 @@ func charArrayToStringArray(charArray: [Character]) -> [String] {
 }
 
 func truncateCharArray(charArray: [Character], sizeLimit: Int) -> [String] {
+    print(charArray)
     var stringArray = [String]()
-    var counter = 0
-    for c in charArray {
-        if counter == sizeLimit {
-            return stringArray
-        }
-        stringArray.append(String(c))
-        counter += 1
+    let decimalLocation = getDecimalLocation(charArray: charArray) // returns 0 if decimal not found
+    var decimalCount = decimalLocation - 2
+    if decimalLocation == 0 {
+        // Ex. "+10.0" has decimal at location 3, 0 indexed, and has exponent 3 - 2 = 1, or e1, resulting in "+1.00e1"
+        // Note the small exponent in the simplified example; exponent notation should only be used for larger numbers
+        decimalCount = charArray.count - 2
     }
+    
+    if (String(charArray[charArray.count - 4]) == "e") {
+        var newSizeLimit = sizeLimit - 4
+        if (String(charArray[charArray.count - 2]) == "0") {
+            newSizeLimit += 1
+        }
+        if (String(charArray[charArray.count - 3]) == "-") {
+            newSizeLimit += 1
+        }
+        var counter = 0
+        for c in charArray {
+            if ((counter < newSizeLimit) && (String(c) != "e")) {
+                stringArray.append(String(c))
+                counter += 1
+            }
+        }
+        stringArray.append("e")
+        if (String(charArray[charArray.count - 3]) == "-") {
+            stringArray.append("-")
+        }
+        if (String(charArray[charArray.count - 2]) == "0") {
+            stringArray.append(String(charArray[charArray.count - 1]))
+        } else {
+            stringArray.append(String(charArray[charArray.count - 2]))
+            stringArray.append(String(charArray[charArray.count - 1]))
+        }
+    } else if (charArray.count > sizeLimit) && ((decimalLocation == 0) || (decimalLocation > sizeLimit)) {
+        // String(charArray[charArray.count - 3]) == "e" could be implied
+        // if the number is larger than sizeLimit and (has no decimal or decimal is outside of sizeLimit)
+        // if has no decimal or decimal is outside of sizeLimit
+        let newSizeLimit = sizeLimit - 3 // exponent is a positive number, so omit "+" sign
+        var counter = 0
+        for c in charArray {
+            if ((counter < newSizeLimit - 1) && (String(c) != "e")) { // -1 for the decimal point
+                if counter == 2 {
+                    stringArray.append(".") // don't incremet counter it's already accounted for in if statement
+                }
+                stringArray.append(String(c))
+                counter += 1
+            }
+        }
+        stringArray.append("e")
+        if (decimalCount) > 10 {
+            stringArray.append(String(((decimalCount) / 10) % 10))
+        }
+        stringArray.append(String((decimalCount) % 10))
+        print(((charArray.count - 2) / 10) % 10)
+        print((charArray.count - 2) % 10)
+    } else {
+        var counter = 0
+        for c in charArray {
+            if counter == sizeLimit {
+                return stringArray
+            }
+            stringArray.append(String(c))
+            counter += 1
+        }
+    }
+    print(stringArray)
     return stringArray
+}
+
+func getDecimalLocation(charArray: [Character]) -> Int {
+    // returns decimal index, otherwise return 0 if no decimal exists
+    var i = 0
+    for c in charArray {
+        if String(c) == "." {
+            return i
+        }
+        i += 1
+    }
+    return 0
 }
 
 class ViewController: UIViewController {
@@ -183,13 +254,13 @@ class ViewController: UIViewController {
         if !(hasInput) {
             resetInputText()
         }
-        if (content == ".") {
-            hasDecimal = true
-        }
-        if (inputText.count == 2 && inputText[1] == "0" && !(hasDecimal)) {
+        if (inputText.count == 2 && inputText[1] == "0" && !(hasDecimal) && content != ".") {
             inputText[1] = content
-        } else if (inputText.count < 7) || ((inputSign == 1) && (inputText.count < 8)) {
+        } else if (content != "." && ((inputText.count < 7) || ((inputSign == 1) && (inputText.count < 8)))) {
             inputText.append(content)
+        } else if (content == "." && !(hasDecimal)) {
+            inputText.append(content)
+            hasDecimal = true
         }
         hasInput = true
         alreadyCalculated = false
@@ -234,9 +305,10 @@ class ViewController: UIViewController {
             let doubleResult = (content as NSString).doubleValue
             if doubleResult == Double(intResult) {
                 resultLabel.text = String(intResult)
+            } else if (String(contentArray[0]) == "+") {
+                resultLabel.text = String(content.characters.dropFirst())
             } else {
-                // resultLabel.text = String(content.characters.dropFirst())
-                resultLabel.text = String(doubleResult)
+                resultLabel.text = content
             }
         } //else if ((sign == 1 && inputText.count >= 2 && displayInput) || (resultSign == 1 && (inputText.count < 2))) {
         else if (Double(content) != nil && String(contentArray[0]) == "+") {
@@ -257,9 +329,7 @@ class ViewController: UIViewController {
             return resultString
         }
         resultSign = 1
-//        if inputText.count < 2 {
-//            return calcIntOrDouble(resultString: resultString, inputString: resultString)
-//        }
+
         let inputString = inputText.joined()
         var result = calcIntOrDouble(resultString: resultString, inputString: inputString)
         if (resultSign == -1 && result.characters.count > 7) {
@@ -371,6 +441,7 @@ class ViewController: UIViewController {
         case "+/-":
             updateSign() // also updates the displayed resultLabel
         case "%":
+            isArithmeticOperator = false
             if hasInput {
                 inputText = charArrayToStringArray(charArray: Array(calculate().characters))
                 updateResultLabel(inputText.joined())
@@ -378,7 +449,6 @@ class ViewController: UIViewController {
                 resultString = charArrayToStringArray(charArray: Array(calculate().characters)).joined()
                 updateResultLabel(resultString)
             }
-            isArithmeticOperator = false
         case "/", "*", "-", "+":
             if !(alreadyCalculated) {
                 resultString = calculate()
