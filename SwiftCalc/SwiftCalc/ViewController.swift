@@ -280,6 +280,7 @@ class ViewController: UIViewController {
                 inputText[0] = "-"
             }
             hasInput = true
+            alreadyCalculated = false
             updateResultLabel(inputText.joined())
         } else { // negate result
             resultSign *= -1
@@ -298,10 +299,14 @@ class ViewController: UIViewController {
         let contentArray = Array(content.characters)
         if (errorOccured && content == "Error") {
             resultLabel.text = "Error"
-        } else if (isFirstInput && String(contentArray[0]) == "-") {
-            // allow negating 0 at start
-            resultLabel.text = content
-        } else if (!(hasInput)) {
+        } else if (isFirstInput || hasInput) {
+            // allow negating 0 or keeping integeral decimal as decimal instead of showing as integer at start
+            if (Double(content) != nil && String(contentArray[0]) == "+") {
+                resultLabel.text = String(content.characters.dropFirst())
+            } else {
+                resultLabel.text = content
+            }
+        } else { // !(hasInput)
             // display result and convert integer decimals to display as integers without the decimal
             // let intResult = Int(Double(content)!) // cast to Double?, unwrap, then to Int
             // let doubleResult = Double(content)!
@@ -314,11 +319,6 @@ class ViewController: UIViewController {
             } else {
                 resultLabel.text = content
             }
-        } //else if ((sign == 1 && inputText.count >= 2 && displayInput) || (resultSign == 1 && (inputText.count < 2))) {
-        else if (Double(content) != nil && String(contentArray[0]) == "+") {
-            resultLabel.text = String(content.characters.dropFirst())
-        } else {
-            resultLabel.text = content
         }
     }
     
@@ -464,8 +464,8 @@ class ViewController: UIViewController {
             if !(alreadyCalculated) {
                 resultString = calculate()
                 alreadyCalculated = true
-                hasInput = false
                 resetInputText()
+                hasInput = false
                 updateResultLabel(resultString)
             }
             isFirstInput = false
