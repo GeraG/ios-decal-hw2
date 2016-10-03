@@ -306,7 +306,7 @@ class ViewController: UIViewController {
             } else {
                 resultLabel.text = content
             }
-        } else { // !(hasInput)
+        } else { // else if (!(hasInput))
             // display result and convert integer decimals to display as integers without the decimal
             // let intResult = Int(Double(content)!) // cast to Double?, unwrap, then to Int
             // let doubleResult = Double(content)!
